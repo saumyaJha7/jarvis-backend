@@ -1,3 +1,5 @@
+import express from "express";
+import cors from "cors";
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { chromium } from "playwright";
@@ -171,3 +173,44 @@ export async function scrapeWebsite(url) {
     }
   }
 }
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+const handleScrapeRequest = async (req, res) => {
+  const targetUrl = req.body?.url || req.query?.url;
+  if (!targetUrl) {
+    return res.status(400).json({
+      success: false,
+      error: "URL is required (pass via JSON body { url } or query param ?url=...)",
+    });
+  }
+
+  try {
+    const result = await scrapeWebsite(targetUrl);
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error during scraping",
+      details: err.message,
+    });
+  }
+};
+
+app.post("/scrape", handleScrapeRequest);
+app.get("/scrape", handleScrapeRequest);
+
+app.listen(PORT, () => {
+  console.log(`Jarvis Scraper Backend running on http://localhost:${PORT}`);
+});
